@@ -58,4 +58,5 @@ export interface Question {
   correctConjugation: string;
   stem: string; // Used for Beginner mode hint
   regularEnding: string | null; // Used for Beginner mode options
+  exampleSentence?: string; // Contextual example
 }

@@ -12,6 +12,7 @@ import {
   HABER_CONJUGATION, 
   IRREGULAR_PARTICIPLES 
 } from '../data/verbDatabase';
+import { VERB_EXAMPLES } from '../data/verbExamples';
 
 export const normalizeSpanishChars = (str: string): string => {
   return str
@@ -117,6 +118,13 @@ export const generateQuestion = (allowedTenses: TenseId[] = []): Question => {
 
   const conjugation = conjugate(verb, tense, pronounIndex);
 
+  // Fetch Example Sentence
+  let exampleSentence: string | undefined;
+  const verbExamples = VERB_EXAMPLES[verb.infinitive];
+  if (verbExamples && verbExamples[tense]) {
+    exampleSentence = verbExamples[tense]![pronounIndex];
+  }
+
   return {
     id: `${verb.infinitive}-${tense}-${pronounIndex}-${Date.now()}`,
     verb,
@@ -124,7 +132,8 @@ export const generateQuestion = (allowedTenses: TenseId[] = []): Question => {
     pronounIndex,
     correctConjugation: conjugation.full,
     stem: conjugation.stem,
-    regularEnding: conjugation.ending
+    regularEnding: conjugation.ending,
+    exampleSentence
   };
 };
 

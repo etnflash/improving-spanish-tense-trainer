@@ -209,6 +209,22 @@ export default function SpanishTenseQuiz() {
             {/* Interaction Area */}
             <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
                 
+                {/* Example Sentence Display */}
+                {currentQuestion.exampleSentence && (
+                    <div className="mt-6 mb-2 p-4 bg-indigo-50 rounded-xl border border-indigo-100 text-center">
+                        <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Context</p>
+                        <p className="text-indigo-900 font-medium text-lg">
+                            {feedback 
+                                ? currentQuestion.exampleSentence 
+                                : currentQuestion.exampleSentence.replace(
+                                    new RegExp(`\\b${currentQuestion.correctConjugation}\\b`, 'gi'), 
+                                    '_______'
+                                  )
+                            }
+                        </p>
+                    </div>
+                )}
+
                 {renderInterface()}
 
                 {/* Feedback Overlay */}
