@@ -14,6 +14,19 @@ import {
 } from '../data/verbDatabase';
 import { VERB_EXAMPLES } from '../data/verbExamples';
 
+const STORAGE_KEY = 'adaptive-tense-stats-v1';
+
+const getStorage = (): Storage | null => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 type TenseStats = {
   attempts: number;
   correct: number;
@@ -37,11 +50,46 @@ const createInitialStats = (): Record<TenseId, TenseStats> => {
 
 const ADAPTIVE_STATE: Record<TenseId, TenseStats> = createInitialStats();
 
+export const saveAdaptiveProgress = () => {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(ADAPTIVE_STATE));
+  } catch {
+    // Storage quota errors should not break gameplay, so we ignore them.
+  }
+};
+
+export const loadAdaptiveProgress = () => {
+  const storage = getStorage();
+  if (!storage) return;
+  const existing = storage.getItem(STORAGE_KEY);
+  if (!existing) return;
+  try {
+    const parsed = JSON.parse(existing) as Partial<Record<TenseId, Partial<TenseStats>>>;
+    (Object.keys(ADAPTIVE_STATE) as TenseId[]).forEach((tense) => {
+      const entry = parsed[tense];
+      ADAPTIVE_STATE[tense] = {
+        attempts: entry?.attempts ?? 0,
+        correct: entry?.correct ?? 0,
+        streak: entry?.streak ?? 0,
+        consecutiveIncorrect: entry?.consecutiveIncorrect ?? 0,
+        lastIncorrectAt: entry?.lastIncorrectAt ?? null
+      };
+    });
+  } catch {
+    // If stored data is corrupt, drop it and start fresh.
+    const storage = getStorage();
+    storage?.removeItem(STORAGE_KEY);
+  }
+};
+
 export const resetAdaptiveProgress = () => {
   const fresh = createInitialStats();
   (Object.keys(fresh) as TenseId[]).forEach((tense) => {
     ADAPTIVE_STATE[tense] = fresh[tense];
   });
+  getStorage()?.removeItem(STORAGE_KEY);
 };
 
 export const recordAnswerResult = (tense: TenseId, wasCorrect: boolean) => {
@@ -56,6 +104,7 @@ export const recordAnswerResult = (tense: TenseId, wasCorrect: boolean) => {
     stats.consecutiveIncorrect += 1;
     stats.lastIncorrectAt = Date.now();
   }
+  saveAdaptiveProgress();
 };
 
 const computeWeight = (tense: TenseId): number => {

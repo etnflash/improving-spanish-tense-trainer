@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Difficulty, Question, PRONOUNS, TenseId } from '../../types';
-import { generateQuestion, checkAnswer, recordAnswerResult } from './services/engine';
+import { generateQuestion, checkAnswer, recordAnswerResult, loadAdaptiveProgress } from './services/engine';
 import { BeginnerInterface } from './components/BeginnerInterface';
 import { TypingInterface } from './components/TypingInterface';
 
@@ -15,7 +15,12 @@ export default function SpanishTenseQuiz() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedTenses, setSelectedTenses] = useState<TenseId[]>(Object.values(TenseId));
 
-  // Initialize first question
+    // Load persisted adaptive stats before first question
+    useEffect(() => {
+        loadAdaptiveProgress();
+    }, []);
+
+    // Initialize first question
   useEffect(() => {
     nextQuestion();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -22,3 +22,4 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 ## Notable Features
 
 - Adaptive tense scheduling remembers your recent misses and surfaces those tenses more frequently for extra practice.
+- Progress is stored in the browser via localStorage, so tense weighting picks up where you left off until storage is cleared.
