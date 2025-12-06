@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Difficulty, Question, PRONOUNS, TenseId } from '../../types';
-import { generateQuestion, checkAnswer, recordAnswerResult, loadAdaptiveProgress } from './services/engine';
+import { generateQuestion, checkAnswer, recordAnswerResult, loadAdaptiveProgress, getAdaptiveInsights, TenseInsight, getPlayerBadge, PlayerBadge } from './services/engine';
 import { BeginnerInterface } from './components/BeginnerInterface';
 import { TypingInterface } from './components/TypingInterface';
 
@@ -9,7 +9,30 @@ export default function SpanishTenseQuiz() {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [feedback, setFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
   const [streak, setStreak] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
+    const [isAnimating, setIsAnimating] = useState(false);
+        const [tenseInsights, setTenseInsights] = useState<TenseInsight[]>([]);
+        const [badgeInfo, setBadgeInfo] = useState<PlayerBadge>(getPlayerBadge());
+        const [celebrationMessage, setCelebrationMessage] = useState<string | null>(null);
+
+    const insightSummary = useMemo(() => {
+        const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
+        const correct = tenseInsights.reduce((sum, entry) => sum + entry.correct, 0);
+        const accuracy = attempts === 0 ? 1 : correct / attempts;
+        const focus = [...tenseInsights]
+            .filter(entry => entry.attempts > 0)
+            .sort((a, b) => (a.recentAccuracy - b.recentAccuracy) || (b.priority - a.priority))
+            .slice(0, 3);
+        return {
+            attempts,
+            correct,
+            accuracy,
+            focus
+        };
+    }, [tenseInsights]);
+
+    const formatTenseLabel = useCallback((tense: TenseId) => {
+        return tense.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }, []);
   
   // Tense Selection State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -18,6 +41,8 @@ export default function SpanishTenseQuiz() {
     // Load persisted adaptive stats before first question
     useEffect(() => {
         loadAdaptiveProgress();
+        setTenseInsights(getAdaptiveInsights());
+        setBadgeInfo(getPlayerBadge());
     }, []);
 
     // Initialize first question
@@ -36,23 +61,42 @@ export default function SpanishTenseQuiz() {
     }, 200);
   };
 
-  const handleAnswer = useCallback((input: string) => {
-    if (!currentQuestion) return;
+    const refreshInsights = useCallback(() => {
+        const latest = getAdaptiveInsights();
+        setTenseInsights(latest);
+        return latest;
+    }, []);
 
-    const correct = checkAnswer(input, currentQuestion.correctConjugation, mode);
+    const refreshBadge = useCallback(() => {
+        setBadgeInfo(getPlayerBadge());
+    }, []);
 
-        recordAnswerResult(currentQuestion.tense, correct);
+        const handleAnswer = useCallback((input: string) => {
+        if (!currentQuestion) return;
 
-        if (correct) {
-      setStreak(s => s + 1);
+        const correct = checkAnswer(input, currentQuestion.correctConjugation, mode);
+
+                recordAnswerResult(currentQuestion.tense, correct);
+                const latest = refreshInsights();
+                refreshBadge();
+
+                if (correct) {
+            const tenseStats = latest.find(entry => entry.tense === currentQuestion.tense);
+            if (tenseStats && tenseStats.recentSampleSize >= 3 && tenseStats.recentAccuracy === 1) {
+                const message = `🔥 Perfect run in ${formatTenseLabel(currentQuestion.tense)}!`;
+                setCelebrationMessage(message);
+                setTimeout(() => setCelebrationMessage(null), 2500);
+            }
+            setStreak(s => s + 1);
       setFeedback({ 
         isCorrect: true, 
         message: '¡Excelente!' 
       });
       // Auto advance after short delay
       setTimeout(nextQuestion, 1500);
-    } else {
-      setStreak(0);
+        } else {
+            setCelebrationMessage(null);
+            setStreak(0);
             setFeedback({ 
         isCorrect: false, 
         message: `Incorrect. The answer was "${currentQuestion.correctConjugation}"` 
@@ -63,6 +107,8 @@ export default function SpanishTenseQuiz() {
   const skipQuestion = () => {
             if (currentQuestion) {
                 recordAnswerResult(currentQuestion.tense, false);
+                refreshInsights();
+                refreshBadge();
             }
             setStreak(0);
             nextQuestion();
@@ -188,6 +234,85 @@ export default function SpanishTenseQuiz() {
             </div>
         )}
       </header>
+
+            {/* Motivation Panel */}
+            <section className="w-full max-w-2xl mb-6">
+                <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-5">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                                Momentum Pulse
+                            </p>
+                            <h3 className="text-xl font-bold text-slate-900">Keep the streak alive!</h3>
+                            {insightSummary.attempts > 0 ? (
+                                <p className="text-sm text-slate-500">
+                                    Overall accuracy {Math.round(insightSummary.accuracy * 100)}% · {insightSummary.attempts} attempts tracked
+                                </p>
+                            ) : (
+                                <p className="text-sm text-slate-500">
+                                    Answer a few questions to unlock personalized focus tips.
+                                </p>
+                            )}
+                        </div>
+                        {insightSummary.attempts > 0 && (
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-indigo-900 text-sm font-semibold">
+                                Daily boost: conquer {formatTenseLabel(insightSummary.focus[0]?.tense ?? TenseId.PRESENT)} next!
+                            </div>
+                        )}
+                    </div>
+
+                    {badgeInfo && (
+                        <div className="mt-4 flex flex-col gap-2 bg-slate-900 rounded-2xl p-4 text-white">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs uppercase tracking-[0.2em] text-slate-300 font-semibold">Badge</p>
+                                    <p className="text-2xl font-extrabold">Level {badgeInfo.level}: {badgeInfo.title}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-300">XP</p>
+                                    <p className="text-lg font-bold">{badgeInfo.currentLevelXp}/{badgeInfo.nextLevelXp}</p>
+                                </div>
+                            </div>
+                            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-indigo-400 via-indigo-300 to-pink-300"
+                                    style={{ width: `${Math.min(100, Math.round(badgeInfo.progress * 100))}%` }}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-300">
+                                Answer questions to earn XP. Consecutive correct answers grant bonus points!
+                            </p>
+                        </div>
+                    )}
+
+                    {celebrationMessage && (
+                        <div className="mt-4 bg-green-50 border border-green-200 rounded-2xl p-4 text-green-800 font-semibold">
+                            {celebrationMessage}
+                        </div>
+                    )}
+
+                    {insightSummary.focus.length > 0 && (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                            {insightSummary.focus.map(entry => {
+                                const recentPercent = Math.round(entry.recentAccuracy * 100);
+                                const sampleLabel = entry.recentSampleSize > 0 ? `Last ${entry.recentSampleSize} tries` : 'Warming up';
+                                const encouragement = recentPercent >= 80
+                                    ? 'On fire!'
+                                    : 'Next milestone within reach';
+                                return (
+                                    <div key={entry.tense} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
+                                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Focus Tense</p>
+                                        <p className="text-base font-bold text-slate-900">{formatTenseLabel(entry.tense)}</p>
+                                        <p className="text-sm text-indigo-600 font-semibold mt-1">Recent accuracy {recentPercent}%</p>
+                                        <p className="text-xs text-slate-500 mt-1">{sampleLabel}</p>
+                                        <p className="text-xs text-green-600 font-semibold mt-1">{encouragement}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </section>
 
       {/* Main Card */}
       <main className={`w-full max-w-2xl transition-opacity duration-200 ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>

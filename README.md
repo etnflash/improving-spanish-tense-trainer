@@ -23,3 +23,6 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 
 - Adaptive tense scheduling remembers your recent misses and surfaces those tenses more frequently for extra practice.
 - Progress is stored in the browser via localStorage, so tense weighting picks up where you left off until storage is cleared.
+- Motivation panel surfaces the lowest-accuracy tenses (“Momentum Pulse”) so you always know which challenge to tackle next.
+- Answering questions grants XP that levels up your learner badge, rewarding streaks with bonus points.
+- Focus cards highlight the last few attempts (not lifetime averages) and trigger celebratory callouts when you hit perfect mini-streaks.

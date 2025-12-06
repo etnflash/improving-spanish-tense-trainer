@@ -15,6 +15,8 @@ import {
 import { VERB_EXAMPLES } from '../data/verbExamples';
 
 const STORAGE_KEY = 'adaptive-tense-stats-v1';
+const XP_PER_LEVEL = 120;
+const LEVEL_TITLES = ['Novato', 'Explorador', 'Aventurero', 'Conquistador', 'Maestro', 'Legendario'];
 
 const getStorage = (): Storage | null => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -33,6 +35,34 @@ type TenseStats = {
   streak: number;
   consecutiveIncorrect: number;
   lastIncorrectAt: number | null;
+  recentResults: number[]; // 1 for correct, 0 for incorrect, capped
+};
+
+export type TenseInsight = {
+  tense: TenseId;
+  attempts: number;
+  correct: number;
+  accuracy: number;
+  recentAccuracy: number;
+  recentSampleSize: number;
+  streak: number;
+  consecutiveIncorrect: number;
+  lastIncorrectAt: number | null;
+  priority: number;
+};
+
+export type PlayerBadge = {
+  xp: number;
+  level: number;
+  title: string;
+  nextLevelXp: number;
+  currentLevelXp: number;
+  progress: number; // 0-1
+};
+
+type PersistedPayload = {
+  stats: Record<TenseId, TenseStats>;
+  xp: number;
 };
 
 const createInitialStats = (): Record<TenseId, TenseStats> => {
@@ -42,19 +72,26 @@ const createInitialStats = (): Record<TenseId, TenseStats> => {
       correct: 0,
       streak: 0,
       consecutiveIncorrect: 0,
-      lastIncorrectAt: null
+      lastIncorrectAt: null,
+      recentResults: []
     };
     return acc;
   }, {} as Record<TenseId, TenseStats>);
 };
 
 const ADAPTIVE_STATE: Record<TenseId, TenseStats> = createInitialStats();
+let PLAYER_XP = 0;
+
+const serializeState = (): PersistedPayload => ({
+  stats: ADAPTIVE_STATE,
+  xp: PLAYER_XP
+});
 
 export const saveAdaptiveProgress = () => {
   const storage = getStorage();
   if (!storage) return;
   try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(ADAPTIVE_STATE));
+    storage.setItem(STORAGE_KEY, JSON.stringify(serializeState()));
   } catch {
     // Storage quota errors should not break gameplay, so we ignore them.
   }
@@ -66,17 +103,24 @@ export const loadAdaptiveProgress = () => {
   const existing = storage.getItem(STORAGE_KEY);
   if (!existing) return;
   try {
-    const parsed = JSON.parse(existing) as Partial<Record<TenseId, Partial<TenseStats>>>;
+    const parsed = JSON.parse(existing) as Partial<Record<string, unknown>> & {
+      stats?: Partial<Record<TenseId, Partial<TenseStats>>>;
+      xp?: number;
+    };
+    const statsSource = parsed.stats && typeof parsed.stats === 'object' ? parsed.stats : (parsed as Partial<Record<TenseId, Partial<TenseStats>>>);
+    const savedXp = typeof parsed.xp === 'number' ? parsed.xp : 0;
     (Object.keys(ADAPTIVE_STATE) as TenseId[]).forEach((tense) => {
-      const entry = parsed[tense];
+      const entry = statsSource?.[tense];
       ADAPTIVE_STATE[tense] = {
         attempts: entry?.attempts ?? 0,
         correct: entry?.correct ?? 0,
         streak: entry?.streak ?? 0,
         consecutiveIncorrect: entry?.consecutiveIncorrect ?? 0,
-        lastIncorrectAt: entry?.lastIncorrectAt ?? null
+        lastIncorrectAt: entry?.lastIncorrectAt ?? null,
+        recentResults: Array.isArray(entry?.recentResults) ? entry!.recentResults!.slice(-5) : []
       };
     });
+    PLAYER_XP = savedXp;
   } catch {
     // If stored data is corrupt, drop it and start fresh.
     const storage = getStorage();
@@ -89,6 +133,7 @@ export const resetAdaptiveProgress = () => {
   (Object.keys(fresh) as TenseId[]).forEach((tense) => {
     ADAPTIVE_STATE[tense] = fresh[tense];
   });
+  PLAYER_XP = 0;
   getStorage()?.removeItem(STORAGE_KEY);
 };
 
@@ -104,7 +149,56 @@ export const recordAnswerResult = (tense: TenseId, wasCorrect: boolean) => {
     stats.consecutiveIncorrect += 1;
     stats.lastIncorrectAt = Date.now();
   }
+  stats.recentResults.push(wasCorrect ? 1 : 0);
+  if (stats.recentResults.length > 5) {
+    stats.recentResults.shift();
+  }
+  const streakBonus = wasCorrect ? Math.max(stats.streak - 1, 0) * 2 : 0;
+  const xpGain = wasCorrect ? 10 + streakBonus : 2;
+  PLAYER_XP += xpGain;
   saveAdaptiveProgress();
+};
+
+export const getAdaptiveInsights = (): TenseInsight[] => {
+  return (Object.keys(ADAPTIVE_STATE) as TenseId[]).map((tense) => {
+    const stats = ADAPTIVE_STATE[tense];
+    const accuracy = stats.attempts === 0 ? 1 : stats.correct / stats.attempts;
+    const recentAccuracy = stats.recentResults.length === 0
+      ? accuracy
+      : stats.recentResults.reduce((sum, r) => sum + r, 0) / stats.recentResults.length;
+    const priority = computeWeight(tense);
+    return {
+      tense,
+      attempts: stats.attempts,
+      correct: stats.correct,
+      accuracy,
+      recentAccuracy,
+      recentSampleSize: stats.recentResults.length,
+      streak: stats.streak,
+      consecutiveIncorrect: stats.consecutiveIncorrect,
+      lastIncorrectAt: stats.lastIncorrectAt,
+      priority
+    };
+  });
+};
+
+const computeLevelFromXp = (xp: number): number => {
+  return Math.floor(xp / XP_PER_LEVEL) + 1;
+};
+
+export const getPlayerBadge = (): PlayerBadge => {
+  const level = computeLevelFromXp(PLAYER_XP);
+  const title = LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)];
+  const currentLevelXp = PLAYER_XP % XP_PER_LEVEL;
+  const progress = XP_PER_LEVEL === 0 ? 1 : currentLevelXp / XP_PER_LEVEL;
+  return {
+    xp: PLAYER_XP,
+    level,
+    title,
+    nextLevelXp: XP_PER_LEVEL,
+    currentLevelXp,
+    progress: Math.min(1, progress)
+  };
 };
 
 const computeWeight = (tense: TenseId): number => {
