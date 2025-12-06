@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Notable Features
+
+- Adaptive tense scheduling remembers your recent misses and surfaces those tenses more frequently for extra practice.

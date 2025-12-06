@@ -14,6 +14,81 @@ import {
 } from '../data/verbDatabase';
 import { VERB_EXAMPLES } from '../data/verbExamples';
 
+type TenseStats = {
+  attempts: number;
+  correct: number;
+  streak: number;
+  consecutiveIncorrect: number;
+  lastIncorrectAt: number | null;
+};
+
+const createInitialStats = (): Record<TenseId, TenseStats> => {
+  return (Object.values(TenseId) as TenseId[]).reduce((acc, tense) => {
+    acc[tense] = {
+      attempts: 0,
+      correct: 0,
+      streak: 0,
+      consecutiveIncorrect: 0,
+      lastIncorrectAt: null
+    };
+    return acc;
+  }, {} as Record<TenseId, TenseStats>);
+};
+
+const ADAPTIVE_STATE: Record<TenseId, TenseStats> = createInitialStats();
+
+export const resetAdaptiveProgress = () => {
+  const fresh = createInitialStats();
+  (Object.keys(fresh) as TenseId[]).forEach((tense) => {
+    ADAPTIVE_STATE[tense] = fresh[tense];
+  });
+};
+
+export const recordAnswerResult = (tense: TenseId, wasCorrect: boolean) => {
+  const stats = ADAPTIVE_STATE[tense];
+  stats.attempts += 1;
+  if (wasCorrect) {
+    stats.correct += 1;
+    stats.streak += 1;
+    stats.consecutiveIncorrect = 0;
+  } else {
+    stats.streak = 0;
+    stats.consecutiveIncorrect += 1;
+    stats.lastIncorrectAt = Date.now();
+  }
+};
+
+const computeWeight = (tense: TenseId): number => {
+  const stats = ADAPTIVE_STATE[tense];
+  if (!stats) return 1;
+  const base = stats.attempts === 0 ? 1.3 : 1;
+  const incorrect = stats.attempts - stats.correct;
+  const accuracyPenalty = incorrect * 0.6;
+  const streakAdjustment = Math.max(0.4, 1 - stats.streak * 0.15);
+  const consecutivePenalty = stats.consecutiveIncorrect * 0.8;
+  const recencyBoost = stats.lastIncorrectAt
+    ? Math.max(0, 1.2 - (Date.now() - stats.lastIncorrectAt) / (1000 * 60 * 10))
+    : 0;
+  const weight = base + accuracyPenalty + consecutivePenalty;
+  return Math.max(0.2, weight * streakAdjustment + recencyBoost);
+};
+
+const pickAdaptiveTense = (pool: TenseId[]): TenseId => {
+  const weights = pool.map((tense) => ({ tense, weight: computeWeight(tense) }));
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight === 0) {
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  let threshold = Math.random() * totalWeight;
+  for (const entry of weights) {
+    if (threshold <= entry.weight) {
+      return entry.tense;
+    }
+    threshold -= entry.weight;
+  }
+  return pool[pool.length - 1];
+};
+
 export const normalizeSpanishChars = (str: string): string => {
   return str
     .toLowerCase()
@@ -102,8 +177,8 @@ export const conjugate = (verb: VerbDefinition, tense: TenseId, pronounIdx: numb
 
 export const generateQuestion = (allowedTenses: TenseId[] = []): Question => {
   const verb = VERBS[Math.floor(Math.random() * VERBS.length)];
-  const pool = allowedTenses.length > 0 ? allowedTenses : Object.values(TenseId);
-  const tense = pool[Math.floor(Math.random() * pool.length)];
+  const pool = allowedTenses.length > 0 ? allowedTenses : (Object.values(TenseId) as TenseId[]);
+  const tense = pickAdaptiveTense(pool);
   
   // Random Pronoun
   let pronounIndex = Math.floor(Math.random() * PRONOUNS.length);

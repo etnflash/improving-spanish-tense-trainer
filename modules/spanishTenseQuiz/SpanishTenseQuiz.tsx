@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Difficulty, Question, PRONOUNS, TenseId } from '../../types';
-import { generateQuestion, checkAnswer } from './services/engine';
+import { generateQuestion, checkAnswer, recordAnswerResult } from './services/engine';
 import { BeginnerInterface } from './components/BeginnerInterface';
 import { TypingInterface } from './components/TypingInterface';
 
@@ -36,7 +36,9 @@ export default function SpanishTenseQuiz() {
 
     const correct = checkAnswer(input, currentQuestion.correctConjugation, mode);
 
-    if (correct) {
+        recordAnswerResult(currentQuestion.tense, correct);
+
+        if (correct) {
       setStreak(s => s + 1);
       setFeedback({ 
         isCorrect: true, 
@@ -46,7 +48,7 @@ export default function SpanishTenseQuiz() {
       setTimeout(nextQuestion, 1500);
     } else {
       setStreak(0);
-      setFeedback({ 
+            setFeedback({ 
         isCorrect: false, 
         message: `Incorrect. The answer was "${currentQuestion.correctConjugation}"` 
       });
@@ -54,8 +56,11 @@ export default function SpanishTenseQuiz() {
   }, [currentQuestion, mode, selectedTenses]); // Added selectedTenses to deps if needed, though strictly handled by nextQuestion
 
   const skipQuestion = () => {
-      setStreak(0);
-      nextQuestion();
+            if (currentQuestion) {
+                recordAnswerResult(currentQuestion.tense, false);
+            }
+            setStreak(0);
+            nextQuestion();
   }
 
   const toggleTense = (tense: TenseId) => {
