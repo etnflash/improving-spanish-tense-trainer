@@ -10,8 +10,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
    `npm install`
@@ -29,3 +28,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 - Focus cards highlight the last few attempts (not lifetime averages) and trigger celebratory callouts when you hit perfect mini-streaks.
 - Need to inspect every tense that’s slipping? Expand the focus cards to show the full list, then collapse back down when you’re done.
 - Don’t want the motivation UI? Hide/show the “Momentum Pulse” panel anytime—your data keeps tracking in the background.
+
+## Development Notes
+
+- Run `npm run lint` for TypeScript/React linting (ESLint) and `npm run format` to apply Prettier rules.
+- `npm run validate:verbs` still checks verb example completeness; it’s a good idea to include it in CI.
+- Husky installs a pre-commit hook that runs `lint-staged`, so staged TS/TSX files get linted and formatted automatically.
