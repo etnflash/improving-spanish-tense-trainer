@@ -17,6 +17,7 @@ import { VERB_EXAMPLES } from '../data/verbExamples';
 const STORAGE_KEY = 'adaptive-tense-stats-v1';
 const XP_PER_LEVEL = 120;
 const LEVEL_TITLES = ['Novato', 'Explorador', 'Aventurero', 'Conquistador', 'Maestro', 'Legendario'];
+const GLOBAL_RECENT_WINDOW = 10;
 
 const getStorage = (): Storage | null => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -36,6 +37,7 @@ type TenseStats = {
   consecutiveIncorrect: number;
   lastIncorrectAt: number | null;
   recentResults: number[]; // 1 for correct, 0 for incorrect, capped
+  xp: number;
 };
 
 export type TenseInsight = {
@@ -49,6 +51,11 @@ export type TenseInsight = {
   consecutiveIncorrect: number;
   lastIncorrectAt: number | null;
   priority: number;
+  xp: number;
+  level: number;
+  currentLevelXp: number;
+  nextLevelXp: number;
+  progress: number;
 };
 
 export type PlayerBadge = {
@@ -63,6 +70,7 @@ export type PlayerBadge = {
 type PersistedPayload = {
   stats: Record<TenseId, TenseStats>;
   xp: number;
+  recent: number[];
 };
 
 const createInitialStats = (): Record<TenseId, TenseStats> => {
@@ -73,7 +81,8 @@ const createInitialStats = (): Record<TenseId, TenseStats> => {
       streak: 0,
       consecutiveIncorrect: 0,
       lastIncorrectAt: null,
-      recentResults: []
+      recentResults: [],
+      xp: 0
     };
     return acc;
   }, {} as Record<TenseId, TenseStats>);
@@ -81,10 +90,12 @@ const createInitialStats = (): Record<TenseId, TenseStats> => {
 
 const ADAPTIVE_STATE: Record<TenseId, TenseStats> = createInitialStats();
 let PLAYER_XP = 0;
+const GLOBAL_RECENT_RESULTS: number[] = [];
 
 const serializeState = (): PersistedPayload => ({
   stats: ADAPTIVE_STATE,
-  xp: PLAYER_XP
+  xp: PLAYER_XP,
+  recent: GLOBAL_RECENT_RESULTS.slice(-GLOBAL_RECENT_WINDOW)
 });
 
 export const saveAdaptiveProgress = () => {
@@ -106,6 +117,7 @@ export const loadAdaptiveProgress = () => {
     const parsed = JSON.parse(existing) as Partial<Record<string, unknown>> & {
       stats?: Partial<Record<TenseId, Partial<TenseStats>>>;
       xp?: number;
+      recent?: number[];
     };
     const statsSource = parsed.stats && typeof parsed.stats === 'object' ? parsed.stats : (parsed as Partial<Record<TenseId, Partial<TenseStats>>>);
     const savedXp = typeof parsed.xp === 'number' ? parsed.xp : 0;
@@ -117,10 +129,16 @@ export const loadAdaptiveProgress = () => {
         streak: entry?.streak ?? 0,
         consecutiveIncorrect: entry?.consecutiveIncorrect ?? 0,
         lastIncorrectAt: entry?.lastIncorrectAt ?? null,
-        recentResults: Array.isArray(entry?.recentResults) ? entry!.recentResults!.slice(-5) : []
+        recentResults: Array.isArray(entry?.recentResults) ? entry!.recentResults!.slice(-5) : [],
+        xp: typeof entry?.xp === 'number' ? entry.xp : 0
       };
     });
     PLAYER_XP = savedXp;
+    GLOBAL_RECENT_RESULTS.splice(0, GLOBAL_RECENT_RESULTS.length);
+    const savedRecent = Array.isArray(parsed.recent) ? parsed.recent : [];
+    savedRecent.slice(-GLOBAL_RECENT_WINDOW).forEach(val => {
+      GLOBAL_RECENT_RESULTS.push(val === 1 ? 1 : 0);
+    });
   } catch {
     // If stored data is corrupt, drop it and start fresh.
     const storage = getStorage();
@@ -134,6 +152,7 @@ export const resetAdaptiveProgress = () => {
     ADAPTIVE_STATE[tense] = fresh[tense];
   });
   PLAYER_XP = 0;
+  GLOBAL_RECENT_RESULTS.splice(0, GLOBAL_RECENT_RESULTS.length);
   getStorage()?.removeItem(STORAGE_KEY);
 };
 
@@ -156,7 +175,24 @@ export const recordAnswerResult = (tense: TenseId, wasCorrect: boolean) => {
   const streakBonus = wasCorrect ? Math.max(stats.streak - 1, 0) * 2 : 0;
   const xpGain = wasCorrect ? 10 + streakBonus : 2;
   PLAYER_XP += xpGain;
+  stats.xp += xpGain;
+  GLOBAL_RECENT_RESULTS.push(wasCorrect ? 1 : 0);
+  if (GLOBAL_RECENT_RESULTS.length > GLOBAL_RECENT_WINDOW) {
+    GLOBAL_RECENT_RESULTS.shift();
+  }
   saveAdaptiveProgress();
+};
+
+const getLevelBreakdown = (xp: number) => {
+  const level = computeLevelFromXp(xp);
+  const currentLevelXp = xp % XP_PER_LEVEL;
+  const progress = XP_PER_LEVEL === 0 ? 1 : currentLevelXp / XP_PER_LEVEL;
+  return {
+    level,
+    currentLevelXp,
+    nextLevelXp: XP_PER_LEVEL,
+    progress: Math.min(1, progress)
+  };
 };
 
 export const getAdaptiveInsights = (): TenseInsight[] => {
@@ -167,6 +203,7 @@ export const getAdaptiveInsights = (): TenseInsight[] => {
       ? accuracy
       : stats.recentResults.reduce((sum, r) => sum + r, 0) / stats.recentResults.length;
     const priority = computeWeight(tense);
+    const levelMeta = getLevelBreakdown(stats.xp);
     return {
       tense,
       attempts: stats.attempts,
@@ -177,9 +214,26 @@ export const getAdaptiveInsights = (): TenseInsight[] => {
       streak: stats.streak,
       consecutiveIncorrect: stats.consecutiveIncorrect,
       lastIncorrectAt: stats.lastIncorrectAt,
-      priority
+      priority,
+      xp: stats.xp,
+      level: levelMeta.level,
+      currentLevelXp: levelMeta.currentLevelXp,
+      nextLevelXp: levelMeta.nextLevelXp,
+      progress: levelMeta.progress
     };
   });
+};
+
+export const getRecentAccuracyWindow = () => {
+  const sampleSize = GLOBAL_RECENT_RESULTS.length;
+  const accuracy = sampleSize === 0
+    ? 1
+    : GLOBAL_RECENT_RESULTS.reduce((sum, val) => sum + val, 0) / sampleSize;
+  return {
+    accuracy,
+    sampleSize,
+    windowSize: GLOBAL_RECENT_WINDOW
+  };
 };
 
 const computeLevelFromXp = (xp: number): number => {
