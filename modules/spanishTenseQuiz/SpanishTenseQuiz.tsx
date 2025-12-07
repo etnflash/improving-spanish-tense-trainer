@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Difficulty, Question, PRONOUNS, TenseId } from '../../types';
 import {
   generateQuestion,
@@ -33,6 +33,7 @@ export default function SpanishTenseQuiz() {
     tense: TenseId;
     rows: { pronoun: string; conjugation: string }[];
   }>(null);
+  const mistakeBreakdownRef = useRef<HTMLDivElement | null>(null);
 
   const insightSummary = useMemo(() => {
     const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
@@ -177,6 +178,12 @@ export default function SpanishTenseQuiz() {
     setStreak(0);
     nextQuestion();
   };
+
+  useEffect(() => {
+    if (mistakeBreakdown && feedback && !feedback.isCorrect && mistakeBreakdownRef.current) {
+      mistakeBreakdownRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [feedback, mistakeBreakdown]);
 
   const toggleTense = (tense: TenseId) => {
     setSelectedTenses((prev) => {
@@ -405,7 +412,10 @@ export default function SpanishTenseQuiz() {
               )}
 
               {mistakeBreakdown && feedback && !feedback.isCorrect && (
-                <div className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2">
+                <div
+                  ref={mistakeBreakdownRef}
+                  className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
+                >
                   <div className="flex flex-col gap-1 mb-4">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
                       Study This Pattern
