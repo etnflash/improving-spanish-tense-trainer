@@ -10,6 +10,7 @@ import {
   getPlayerBadge,
   PlayerBadge,
   getRecentAccuracyWindow,
+  conjugate,
 } from './services/engine';
 import { BeginnerInterface } from './components/BeginnerInterface';
 import { TypingInterface } from './components/TypingInterface';
@@ -26,6 +27,12 @@ export default function SpanishTenseQuiz() {
   const [showMomentumPanel, setShowMomentumPanel] = useState(true);
   const [showAllFocus, setShowAllFocus] = useState(false);
   const [recentSnapshot, setRecentSnapshot] = useState(() => getRecentAccuracyWindow());
+  const [mistakeBreakdown, setMistakeBreakdown] = useState<null | {
+    verb: string;
+    translation: string;
+    tense: TenseId;
+    rows: { pronoun: string; conjugation: string }[];
+  }>(null);
 
   const insightSummary = useMemo(() => {
     const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
@@ -88,6 +95,7 @@ export default function SpanishTenseQuiz() {
 
   const nextQuestion = () => {
     setFeedback(null);
+    setMistakeBreakdown(null);
     setIsAnimating(true);
     setTimeout(() => {
       // Pass the selected tenses to the generator
@@ -105,6 +113,16 @@ export default function SpanishTenseQuiz() {
 
   const refreshBadge = useCallback(() => {
     setBadgeInfo(getPlayerBadge());
+  }, []);
+
+  const buildConjugationBreakdown = useCallback((question: Question) => {
+    return PRONOUNS.map((pronoun, index) => {
+      const form = conjugate(question.verb, question.tense, index).full || '—';
+      return {
+        pronoun,
+        conjugation: form === '-' ? '—' : form,
+      };
+    });
   }, []);
 
   const handleAnswer = useCallback(
@@ -129,6 +147,7 @@ export default function SpanishTenseQuiz() {
           isCorrect: true,
           message: '¡Excelente!',
         });
+        setMistakeBreakdown(null);
         // Auto advance after short delay
         setTimeout(nextQuestion, 1500);
       } else {
@@ -138,9 +157,15 @@ export default function SpanishTenseQuiz() {
           isCorrect: false,
           message: `Incorrect. The answer was "${currentQuestion.correctConjugation}"`,
         });
+        setMistakeBreakdown({
+          verb: currentQuestion.verb.infinitive,
+          translation: currentQuestion.verb.translation,
+          tense: currentQuestion.tense,
+          rows: buildConjugationBreakdown(currentQuestion),
+        });
       }
     },
-    [currentQuestion, mode, selectedTenses],
+    [buildConjugationBreakdown, currentQuestion, mode, selectedTenses],
   ); // Added selectedTenses to deps if needed, though strictly handled by nextQuestion
 
   const skipQuestion = () => {
@@ -376,6 +401,35 @@ export default function SpanishTenseQuiz() {
                       Next Question
                     </button>
                   )}
+                </div>
+              )}
+
+              {mistakeBreakdown && feedback && !feedback.isCorrect && (
+                <div className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex flex-col gap-1 mb-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
+                      Study This Pattern
+                    </p>
+                    <h4 className="text-xl font-bold">
+                      {mistakeBreakdown.verb} · {formatTenseLabel(mistakeBreakdown.tense)}
+                    </h4>
+                    <p className="text-sm text-slate-300">{mistakeBreakdown.translation}</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {mistakeBreakdown.rows.map((row) => (
+                      <div
+                        key={`${mistakeBreakdown.verb}-${row.pronoun}`}
+                        className="bg-slate-800/60 rounded-xl p-3 border border-slate-700"
+                      >
+                        <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                          {row.pronoun}
+                        </p>
+                        <p className="text-base font-bold mt-1 text-white break-words">
+                          {row.conjugation}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

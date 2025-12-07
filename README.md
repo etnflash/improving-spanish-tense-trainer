@@ -26,6 +26,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1HWiz6SuUZsaX7H6m80vwtX
 - Answering questions grants XP that levels up your learner badge, rewarding streaks with bonus points.
 - Every tense now has its own XP bar and mini-levels so you can prestige specific weak spots while still progressing overall.
 - Focus cards highlight the last few attempts (not lifetime averages) and trigger celebratory callouts when you hit perfect mini-streaks.
+- Miss one? A full conjugation grid pops up for that verb + tense so you can review the pattern immediately.
 - Need to inspect every tense that’s slipping? Expand the focus cards to show the full list, then collapse back down when you’re done.
 - Don’t want the motivation UI? Hide/show the “Momentum Pulse” panel anytime—your data keeps tracking in the background.
 
