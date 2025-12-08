@@ -380,11 +380,7 @@ export default function SpanishTenseQuiz() {
             </div>
 
             {/* Interaction Area */}
-            <div
-              className={`p-8 bg-white min-h-[300px] flex flex-col justify-center ${
-                showBreakdown ? 'pb-36 md:pb-8' : ''
-              }`}
-            >
+            <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
               {/* Example Sentence Display */}
               {currentQuestion.exampleSentence && (
                 <div className="mt-6 mb-2 p-4 bg-indigo-50 rounded-xl border border-indigo-100 text-center">
@@ -658,7 +654,7 @@ export default function SpanishTenseQuiz() {
                     className="text-xs font-semibold text-slate-300 underline"
                     onClick={() => setMistakeBreakdown(null)}
                   >
-                    닫기
+                    Close
                   </button>
                 </div>
               </div>
