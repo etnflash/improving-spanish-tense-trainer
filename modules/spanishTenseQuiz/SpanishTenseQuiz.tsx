@@ -428,7 +428,7 @@ export default function SpanishTenseQuiz() {
               {mistakeBreakdown && feedback && !feedback.isCorrect && (
                 <div
                   ref={mistakeBreakdownRef}
-                  className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
+                  className="hidden md:block mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
                 >
                   <div className="flex flex-col gap-1 mb-4">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
