@@ -35,7 +35,27 @@ export default function SpanishTenseQuiz() {
     tense: TenseId;
     rows: { pronoun: string; conjugation: string }[];
   }>(null);
-  const mistakeBreakdownRef = useRef<HTMLDivElement | null>(null);
+  const feedbackSectionRef = useRef<HTMLDivElement | null>(null);
+  const [prefersInlineBreakdown, setPrefersInlineBreakdown] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const updateMatch = () => setPrefersInlineBreakdown(mediaQuery.matches);
+    updateMatch();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateMatch);
+    } else {
+      mediaQuery.addListener(updateMatch);
+    }
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', updateMatch);
+      } else {
+        mediaQuery.removeListener(updateMatch);
+      }
+    };
+  }, []);
 
   const insightSummary = useMemo(() => {
     const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
@@ -193,10 +213,10 @@ export default function SpanishTenseQuiz() {
   const showBreakdown = Boolean(mistakeBreakdown && feedback && !feedback.isCorrect);
 
   useEffect(() => {
-    if (showBreakdown && mistakeBreakdownRef.current) {
-      mistakeBreakdownRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (showBreakdown && prefersInlineBreakdown && feedbackSectionRef.current) {
+      feedbackSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [showBreakdown]);
+  }, [prefersInlineBreakdown, showBreakdown]);
 
   const toggleTense = (tense: TenseId) => {
     setSelectedTenses((prev) => {
@@ -400,6 +420,7 @@ export default function SpanishTenseQuiz() {
               {/* Feedback Overlay */}
               {feedback && (
                 <div
+                  ref={feedbackSectionRef}
                   className={`mt-6 p-4 rounded-xl text-center animate-in fade-in slide-in-from-bottom-4 ${
                     feedback.isCorrect
                       ? 'bg-green-50 text-green-800 border border-green-200'
@@ -422,10 +443,7 @@ export default function SpanishTenseQuiz() {
               )}
 
               {mistakeBreakdown && feedback && !feedback.isCorrect && (
-                <div
-                  ref={mistakeBreakdownRef}
-                  className="hidden md:block mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
-                >
+                <div className="hidden md:block mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2">
                   <div className="flex flex-col gap-1 mb-4">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
                       Study This Pattern
