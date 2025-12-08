@@ -15,6 +15,8 @@ import {
 import { BeginnerInterface } from './components/BeginnerInterface';
 import { TypingInterface } from './components/TypingInterface';
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export default function SpanishTenseQuiz() {
   const [mode, setMode] = useState<Difficulty>(Difficulty.BEGINNER);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -125,6 +127,15 @@ export default function SpanishTenseQuiz() {
       };
     });
   }, []);
+
+  const maskExampleSentence = useCallback(
+    (sentence?: string) => {
+      if (!sentence || !currentQuestion) return sentence;
+      const pattern = escapeRegExp(currentQuestion.correctConjugation);
+      return sentence.replace(new RegExp(pattern, 'giu'), '_______');
+    },
+    [currentQuestion],
+  );
 
   const handleAnswer = useCallback(
     (input: string) => {
@@ -383,10 +394,7 @@ export default function SpanishTenseQuiz() {
                   <p className="text-indigo-900 font-medium text-lg">
                     {feedback
                       ? currentQuestion.exampleSentence
-                      : currentQuestion.exampleSentence.replace(
-                          new RegExp(`\\b${currentQuestion.correctConjugation}\\b`, 'gi'),
-                          '_______',
-                        )}
+                      : maskExampleSentence(currentQuestion.exampleSentence)}
                   </p>
                 </div>
               )}
