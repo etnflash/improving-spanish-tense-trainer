@@ -34,6 +34,17 @@ export default function SpanishTenseQuiz() {
     rows: { pronoun: string; conjugation: string }[];
   }>(null);
   const mistakeBreakdownRef = useRef<HTMLDivElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const insightSummary = useMemo(() => {
     const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
@@ -180,10 +191,19 @@ export default function SpanishTenseQuiz() {
   };
 
   useEffect(() => {
-    if (mistakeBreakdown && feedback && !feedback.isCorrect && mistakeBreakdownRef.current) {
+    if (
+      mistakeBreakdown &&
+      feedback &&
+      !feedback.isCorrect &&
+      mistakeBreakdownRef.current &&
+      !isMobile
+    ) {
       mistakeBreakdownRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, [feedback, mistakeBreakdown]);
+  }, [feedback, isMobile, mistakeBreakdown]);
+
+  const showBreakdown = Boolean(mistakeBreakdown && feedback && !feedback.isCorrect);
+  const showMobileBreakdown = showBreakdown && isMobile;
 
   const toggleTense = (tense: TenseId) => {
     setSelectedTenses((prev) => {
@@ -367,7 +387,11 @@ export default function SpanishTenseQuiz() {
             </div>
 
             {/* Interaction Area */}
-            <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
+            <div
+              className={`p-8 bg-white min-h-[300px] flex flex-col justify-center ${
+                showMobileBreakdown ? 'pb-36' : ''
+              }`}
+            >
               {/* Example Sentence Display */}
               {currentQuestion.exampleSentence && (
                 <div className="mt-6 mb-2 p-4 bg-indigo-50 rounded-xl border border-indigo-100 text-center">
@@ -411,7 +435,7 @@ export default function SpanishTenseQuiz() {
                 </div>
               )}
 
-              {mistakeBreakdown && feedback && !feedback.isCorrect && (
+              {mistakeBreakdown && !isMobile && feedback && !feedback.isCorrect && (
                 <div
                   ref={mistakeBreakdownRef}
                   className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
@@ -613,6 +637,66 @@ export default function SpanishTenseQuiz() {
           </div>
         </div>
       </section>
+
+      {showMobileBreakdown && mistakeBreakdown && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/60 z-40 md:hidden"
+            onClick={() => setMistakeBreakdown(null)}
+          />
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 md:hidden px-4 pb-4"
+            role="dialog"
+            aria-label="Conjugation breakdown"
+          >
+            <div
+              className="bg-slate-900 text-white rounded-3xl border border-slate-800 shadow-2xl p-5 max-h-[70vh] overflow-y-auto"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex flex-col gap-1 mb-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
+                  Study This Pattern
+                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-xl font-bold">
+                      {mistakeBreakdown.verb} · {formatTenseLabel(mistakeBreakdown.tense)}
+                    </h4>
+                    <p className="text-sm text-slate-300">{mistakeBreakdown.translation}</p>
+                  </div>
+                  <button
+                    className="text-xs font-semibold text-slate-300 underline"
+                    onClick={() => setMistakeBreakdown(null)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {mistakeBreakdown.rows.map((row) => (
+                  <div
+                    key={`${mistakeBreakdown.verb}-${row.pronoun}`}
+                    className="bg-slate-800/60 rounded-xl p-3 border border-slate-700"
+                  >
+                    <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                      {row.pronoun}
+                    </p>
+                    <p className="text-base font-bold mt-1 text-white break-words">
+                      {row.conjugation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={nextQuestion}
+                className="mt-5 w-full px-4 py-3 rounded-2xl bg-indigo-500 text-white font-semibold text-base"
+              >
+                Next Question
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
