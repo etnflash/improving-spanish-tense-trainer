@@ -34,17 +34,6 @@ export default function SpanishTenseQuiz() {
     rows: { pronoun: string; conjugation: string }[];
   }>(null);
   const mistakeBreakdownRef = useRef<HTMLDivElement | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const insightSummary = useMemo(() => {
     const attempts = tenseInsights.reduce((sum, entry) => sum + entry.attempts, 0);
@@ -190,20 +179,13 @@ export default function SpanishTenseQuiz() {
     nextQuestion();
   };
 
+  const showBreakdown = Boolean(mistakeBreakdown && feedback && !feedback.isCorrect);
+
   useEffect(() => {
-    if (
-      mistakeBreakdown &&
-      feedback &&
-      !feedback.isCorrect &&
-      mistakeBreakdownRef.current &&
-      !isMobile
-    ) {
+    if (showBreakdown && mistakeBreakdownRef.current) {
       mistakeBreakdownRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, [feedback, isMobile, mistakeBreakdown]);
-
-  const showBreakdown = Boolean(mistakeBreakdown && feedback && !feedback.isCorrect);
-  const showMobileBreakdown = showBreakdown && isMobile;
+  }, [showBreakdown]);
 
   const toggleTense = (tense: TenseId) => {
     setSelectedTenses((prev) => {
@@ -389,7 +371,7 @@ export default function SpanishTenseQuiz() {
             {/* Interaction Area */}
             <div
               className={`p-8 bg-white min-h-[300px] flex flex-col justify-center ${
-                showMobileBreakdown ? 'pb-36' : ''
+                showBreakdown ? 'pb-36 md:pb-8' : ''
               }`}
             >
               {/* Example Sentence Display */}
@@ -435,7 +417,7 @@ export default function SpanishTenseQuiz() {
                 </div>
               )}
 
-              {mistakeBreakdown && !isMobile && feedback && !feedback.isCorrect && (
+              {mistakeBreakdown && feedback && !feedback.isCorrect && (
                 <div
                   ref={mistakeBreakdownRef}
                   className="mt-6 bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 animate-in fade-in slide-in-from-bottom-2"
@@ -638,7 +620,7 @@ export default function SpanishTenseQuiz() {
         </div>
       </section>
 
-      {showMobileBreakdown && mistakeBreakdown && (
+      {showBreakdown && mistakeBreakdown && (
         <>
           <div
             className="fixed inset-0 bg-slate-900/60 z-40 md:hidden"
