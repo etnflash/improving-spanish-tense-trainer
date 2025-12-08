@@ -36,6 +36,7 @@ export default function SpanishTenseQuiz() {
     rows: { pronoun: string; conjugation: string }[];
   }>(null);
   const feedbackSectionRef = useRef<HTMLDivElement | null>(null);
+  const questionCardRef = useRef<HTMLDivElement | null>(null);
   const [prefersInlineBreakdown, setPrefersInlineBreakdown] = useState(true);
 
   useEffect(() => {
@@ -111,6 +112,13 @@ export default function SpanishTenseQuiz() {
     }
   }, [showMomentumPanel]);
 
+  // Keep the desktop question card in view after manual advances
+  const scrollQuestionCardIntoView = useCallback(() => {
+    if (prefersInlineBreakdown && questionCardRef.current) {
+      questionCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [prefersInlineBreakdown]);
+
   // Initialize first question
   useEffect(() => {
     nextQuestion();
@@ -120,6 +128,7 @@ export default function SpanishTenseQuiz() {
     setFeedback(null);
     setMistakeBreakdown(null);
     setIsAnimating(true);
+    scrollQuestionCardIntoView();
     setTimeout(() => {
       // Pass the selected tenses to the generator
       setCurrentQuestion(generateQuestion(selectedTenses));
@@ -372,7 +381,10 @@ export default function SpanishTenseQuiz() {
         className={`w-full max-w-2xl mb-6 transition-opacity duration-200 ${isAnimating ? 'opacity-0' : 'opacity-100'}`}
       >
         {currentQuestion && (
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+          <div
+            ref={questionCardRef}
+            className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden"
+          >
             {/* Question Header */}
             <div className="bg-slate-900 p-8 text-center relative">
               <div className="absolute top-4 right-4 flex items-center gap-2">
